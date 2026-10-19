@@ -13,8 +13,11 @@ O botão usa o `render.yaml` deste repositório para preparar um **Web Service n
 | `DATABASE_URL` | Conexão PostgreSQL copiada do projeto Neon Free |
 | `ADMIN_USER` | `equipe` — já definido na configuração |
 | `ADMIN_PASSWORD` | Uma senha sua com pelo menos 16 caracteres |
+| `NEON_AUTH_BASE_URL` | URL de autenticação da branch, obtida com `neon deploy` |
+| `NEON_AUTH_COOKIE_SECRET` | Segredo aleatório com pelo menos 32 caracteres |
+| `ADMIN_EMAILS` | E-mails da equipe autorizados a acessar o painel |
 
-O Render fornece `PORT` automaticamente. Após o estado **Live**, use o endereço HTTPS informado pelo Render: `/consertai` abre a página, `/painel` pede o usuário e a senha da equipe, e `/health` verifica o servidor.
+O Render fornece `PORT` automaticamente. Após o estado **Live**, use o endereço HTTPS informado pelo Render: `/consertai` abre a página, `/equipe` abre o login com Neon Auth, `/painel` contém as métricas privadas e `/health` verifica o servidor. No primeiro acesso, crie sua conta e verifique seu e-mail. Apenas os e-mails em `ADMIN_EMAILS` recebem acesso ao painel.
 
 O [guia completo](GUIA-RENDER.md) também explica a publicação manual.
 
@@ -28,8 +31,8 @@ O [guia completo](GUIA-RENDER.md) também explica a publicação manual.
 
 ## Executar localmente
 
-Requer Node.js 24. Execute `npm ci` e `npm start`. Sem `DATABASE_URL`, os dados ficam em `data/`, fora da página pública e ignorados pelo Git. A página abre em `http://127.0.0.1:4173/consertai` e o painel local em `/painel`.
+Requer Node.js 24. Execute `npm ci`, `npm run build` e `npm start`. As variáveis de `.env.local` são carregadas automaticamente. Sem `DATABASE_URL`, os dados ficam em `data/`, fora da página pública e ignorados pelo Git. A página abre em `http://127.0.0.1:4173/consertai`. Veja [a integração Neon e o acesso da equipe](NEON.md).
 
 ## Verificação
 
-A versão preparada passou por verificações locais de autenticação, formulário, concorrência, deduplicação e persistência. A conexão com o Neon real e a publicação precisam ser conferidas depois da configuração na conta do responsável.
+`npm run build` valida o código e gera os recursos do login. `npm run test:neon` verifica o banco e a autenticação reais usando contas sintéticas, incluindo cadastro, contagem concorrente, reinício e sessão. Esse teste precisa de `.env.local` configurado e limpa seus próprios registros ao terminar. A entrega de códigos a uma caixa de e-mail real é uma conferência manual separada.

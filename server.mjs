@@ -1,3 +1,4 @@
+import './env.mjs';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -5,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { isIP } from 'node:net';
 import { createStorage } from './storage.mjs';
+import { authEnabled, teamSession, proxyAuth } from './auth.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -42,8 +44,14 @@ function localOnly(req) {
   const proxy = Object.keys(req.headers).some(name => /forwarded|^x-real-ip$|^cf-connecting-ip$|^true-client-ip$|^via$|^cf-ray$/i.test(name));
   return localAddress && localHost && !proxy;
 }
-function allowAdmin(req, res) {
-  if (!IS_RENDER && localOnly(req)) return true;
+async function allowAdmin(req, res) {
+  if (authEnabled && await teamSession(req, res)) return true;
+  if (!authEnabled && !IS_RENDER && localOnly(req)) return true;
+  if (authEnabled && !req.headers.authorization) {
+    if (['/painel', '/painel.html'].includes(new URL(req.url, 'http://localhost').pathname)) { res.writeHead(303, { Location: '/equipe', 'Cache-Control': 'no-store' }); res.end(); }
+    else json(res, 401, { ok: false, error: 'Entre com uma conta autorizada da equipe.' });
+    return false;
+  }
   if (!ADMIN_PASSWORD) { json(res, 403, { ok: false, error: 'Área disponível apenas no computador local.' }); return false; }
   const header = req.headers.authorization || '';
   const supplied = /^Basic /i.test(header) ? Buffer.from(header.slice(6), 'base64').toString('utf8') : '';
@@ -161,7 +169,14 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost'); const pathname = url.pathname;
     const privateRoute = ['/painel', '/painel.html', '/api/metrics', '/api/leads/export.csv'].includes(pathname);
-    if (privateRoute && !allowAdmin(req, res)) return;
+    if (privateRoute && !await allowAdmin(req, res)) return;
+    if (pathname.startsWith('/api/auth/')) {
+      if (!sameOrigin(req)) throw fail(403, 'Origem não autorizada.');
+      limit(req, 'admin');
+      const body = req.method === 'POST' ? await bodyOf(req) : undefined;
+      if (await proxyAuth(req, res, pathname.slice('/api/auth/'.length), body)) return;
+      throw fail(404, 'Autenticação indisponível.');
+    }
     if (req.method === 'POST' && ['/api/event', '/api/lead', '/api/interest'].includes(pathname)) {
       if (!sameOrigin(req)) throw fail(403, 'Origem não autorizada.');
       limit(req, pathname === '/api/lead' ? 'lead' : pathname === '/api/interest' ? 'interest' : 'event');
@@ -170,6 +185,7 @@ const server = http.createServer(async (req, res) => {
     if (!['GET', 'HEAD'].includes(req.method)) { res.setHeader('Allow', 'GET, HEAD, POST'); throw fail(405, 'Método não permitido.'); }
     if (pathname === '/health') return json(res, 200, { ok: true });
     if (pathname === '/api/interest-count') return json(res, 200, { count: await storage.countInterests() });
+    if (pathname === '/api/team/session') return json(res, 200, { enabled: authEnabled, authorized: Boolean(await teamSession(req, res)) });
     if (pathname === '/api/metrics') return json(res, 200, await metrics());
     if (pathname === '/api/leads/export.csv') {
       await storage.flush(); const leads = (await storage.rows('leads')).filter(l => !String(l.session).startsWith('qa_'));
@@ -180,6 +196,7 @@ const server = http.createServer(async (req, res) => {
     let relative;
     if (['/', '/consertai', '/consertai/', '/index.html'].includes(pathname)) relative = 'index.html';
     else if (['/painel', '/painel.html'].includes(pathname)) relative = 'painel.html';
+    else if (pathname === '/equipe') relative = 'equipe.html';
     else if (['/app.js', '/styles.css'].includes(pathname)) relative = pathname.slice(1);
     else if (pathname.startsWith('/assets/')) { try { relative = decodeURIComponent(pathname).slice(1); } catch { throw fail(400, 'Endereço inválido.'); } }
     else throw fail(404, 'Página não encontrada.');

@@ -3,7 +3,7 @@ services:
     name: consertai
     runtime: node
     plan: free
-    buildCommand: npm ci --omit=dev
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
     envVars:
@@ -12,4 +12,10 @@ services:
       - key: ADMIN_USER
         value: equipe
       - key: ADMIN_PASSWORD
+        sync: false
+      - key: NEON_AUTH_BASE_URL
+        sync: false
+      - key: NEON_AUTH_COOKIE_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
         sync: false

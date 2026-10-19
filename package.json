@@ -1,10 +1,27 @@
 {
- "name":"consertai-piloto",
- "version":"1.0.0",
- "private":true,
- "description":"Landing page e coleta de interesse do piloto concierge ConsertAí",
- "type":"module",
- "scripts":{"start":"node server.mjs","check":"node --check server.mjs && node --check public/app.js"},
- "engines":{"node":"24.x"},
- "dependencies":{"pg":"8.23.1"}
+ "name": "consertai-piloto",
+ "version": "1.0.0",
+ "private": true,
+ "description": "Landing page e coleta de interesse do piloto concierge ConsertAí",
+ "type": "module",
+ "scripts": {
+  "build": "node scripts/build.mjs",
+  "test:neon": "node scripts/test-neon.mjs",
+  "start": "node server.mjs",
+  "check": "node --check server.mjs && node --check public/app.js"
+ },
+ "engines": {
+  "node": "24.x"
+ },
+ "dependencies": {
+  "@neon/config": "^1.9.2",
+  "@neon/env": "^1.6.3",
+  "@neondatabase/auth": "0.6.0-beta",
+  "pg": "8.23.1"
+ },
+ "devDependencies": {
+  "@types/node": "26.6.5",
+  "esbuild": "0.28.2",
+  "typescript": "5.9.3"
+ }
 }
