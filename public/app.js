@@ -81,7 +81,7 @@
    const name=data.name.trim().split(' ')[0];form.reset();setAudience(state.audience);state.started=false;
    status.className='form-status success';status.textContent=`${name}, seu interesse foi registrado! Para conversar com a equipe agora, abra a mensagem abaixo e confirme o envio no WhatsApp. Protocolo: ${result.id.slice(0,8)}.`;
    const message=`Olá, equipe ConsertAí! ${data.audience==='profissional'?'Quero participar do piloto como profissional.':'Quero participar do piloto e preciso de um serviço.'}\nNome: ${data.name}\nCidade: ${data.city}\n${data.audience==='profissional'?'Especialidade':'Serviço'}: ${data.service}${data.description?'\nDetalhes: '+data.description:''}\nProtocolo: ${result.id.slice(0,8)}`;
-   const followup=$('#whatsapp-followup');followup.href='https://wa.me/5555996637084?text='+encodeURIComponent(message);followup.hidden=false;
+   const followup=$('#whatsapp-followup');followup.href='https://wa.me/5555996637074?text='+encodeURIComponent(message);followup.hidden=false;
   } catch(error){status.className='form-status error';status.textContent=location.protocol==='file:'?'Para enviar seu interesse, abra o site pelo servidor ou pelo endereço publicado.':error.message==='Failed to fetch'?'Não foi possível conectar. Confira sua internet e tente novamente.':error.message;}
   finally{button.disabled=false;}
  });
