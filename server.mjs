@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { isIP } from 'node:net';
 import { createStorage } from './storage.mjs';
-import { authEnabled, teamSession, proxyAuth } from './auth.mjs';
+import { createMarketplaceStore } from './marketplace-store.mjs';
+import { createMarketplaceApi } from './marketplace-api.mjs';
+import { authEnabled, memberSession, teamSession, proxyAuth } from './auth.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -22,6 +24,8 @@ if (IS_RENDER && !process.env.DATABASE_URL?.trim()) throw new Error('Configure D
 if (IS_RENDER && ADMIN_PASSWORD.length < 16) throw new Error('Configure ADMIN_PASSWORD com pelo menos 16 caracteres no Render.');
 const storage = await createStorage({ dataDir: DATA });
 if (IS_RENDER && storage.mode !== 'postgres') throw new Error('O Render precisa usar o armazenamento PostgreSQL configurado.');
+const marketplace = await createMarketplaceStore({ dataDir: DATA });
+if (IS_RENDER && marketplace.mode !== 'postgres') throw new Error('O marketplace precisa usar o PostgreSQL configurado no Render.');
 const INTEREST_ID = /^(?:qa_)?[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const CTA = new Set(['hero_cliente', 'hero_profissional', 'nav_piloto', 'servico_eletrica', 'servico_hidraulica', 'servico_montagem', 'servico_reparos', 'servico_limpeza', 'servico_baba', 'piloto_cliente', 'piloto_profissional', 'enviar_cliente', 'enviar_profissional', 'footer_piloto', 'whatsapp_contato', 'whatsapp_cadastro']);
 const SESSION = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -48,7 +52,7 @@ async function allowAdmin(req, res) {
   if (authEnabled && await teamSession(req, res)) return true;
   if (!authEnabled && !IS_RENDER && localOnly(req)) return true;
   if (authEnabled && !req.headers.authorization) {
-    if (['/painel', '/painel.html'].includes(new URL(req.url, 'http://localhost').pathname)) { res.writeHead(303, { Location: '/equipe', 'Cache-Control': 'no-store' }); res.end(); }
+    if (['/painel', '/painel.html', '/gestao'].includes(new URL(req.url, 'http://localhost').pathname)) { res.writeHead(303, { Location: '/equipe', 'Cache-Control': 'no-store' }); res.end(); }
     else json(res, 401, { ok: false, error: 'Entre com uma conta autorizada da equipe.' });
     return false;
   }
@@ -92,6 +96,7 @@ async function bodyOf(req) {
   if (!body || Array.isArray(body) || typeof body !== 'object') throw fail(400, 'Dados inválidos.');
   return body;
 }
+const marketplaceApi = createMarketplaceApi({ store: marketplace, allowAdmin, bodyOf, fail, json, limit, sameOrigin, text });
 async function event(req, res) {
   const body = await bodyOf(req); const ctx = context(body);
   if (!['page_view', 'cta_click', 'form_start'].includes(body.type)) throw fail(400, 'Evento desconhecido.');
@@ -168,7 +173,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   try {
     const url = new URL(req.url, 'http://localhost'); const pathname = url.pathname;
-    const privateRoute = ['/painel', '/painel.html', '/api/metrics', '/api/leads/export.csv'].includes(pathname);
+    const privateRoute = ['/painel', '/painel.html', '/gestao', '/api/metrics', '/api/leads/export.csv'].includes(pathname);
     if (privateRoute && !await allowAdmin(req, res)) return;
     if (pathname.startsWith('/api/auth/')) {
       if (!sameOrigin(req)) throw fail(403, 'Origem não autorizada.');
@@ -177,6 +182,7 @@ const server = http.createServer(async (req, res) => {
       if (await proxyAuth(req, res, pathname.slice('/api/auth/'.length), body)) return;
       throw fail(404, 'Autenticação indisponível.');
     }
+    if (await marketplaceApi(req, res, url)) return;
     if (req.method === 'POST' && ['/api/event', '/api/lead', '/api/interest'].includes(pathname)) {
       if (!sameOrigin(req)) throw fail(403, 'Origem não autorizada.');
       limit(req, pathname === '/api/lead' ? 'lead' : pathname === '/api/interest' ? 'interest' : 'event');
@@ -193,18 +199,28 @@ const server = http.createServer(async (req, res) => {
       const content = '\ufeff' + [fields.map(csvCell).join(';'), ...leads.map(l => fields.map(f => csvCell(l[f])).join(';'))].join('\r\n');
       res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="consertai-cadastros.csv"', 'Cache-Control': 'no-store' }); return res.end(req.method === 'HEAD' ? undefined : content);
     }
+    const memberPage = ['/profissionais', '/meu-perfil', '/minha-conta'].includes(pathname);
+    if (memberPage && !(authEnabled && await memberSession(req, res))) {
+      res.writeHead(303, { Location: '/entrar?voltar=' + encodeURIComponent(pathname + url.search), 'Cache-Control': 'no-store' });
+      return res.end();
+    }
     let relative;
     if (['/', '/consertai', '/consertai/', '/index.html'].includes(pathname)) relative = 'index.html';
     else if (['/painel', '/painel.html'].includes(pathname)) relative = 'painel.html';
     else if (pathname === '/equipe') relative = 'equipe.html';
-    else if (['/app.js', '/styles.css'].includes(pathname)) relative = pathname.slice(1);
+    else if (pathname === '/gestao') relative = 'gestao.html';
+    else if (pathname === '/entrar') relative = 'entrar.html';
+    else if (pathname === '/profissionais') relative = 'profissionais.html';
+    else if (pathname === '/meu-perfil') relative = 'meu-perfil.html';
+    else if (pathname === '/minha-conta') relative = 'minha-conta.html';
+    else if (['/app.js', '/styles.css', '/marketplace.css', '/marketplace-ui.js', '/providers.js', '/profile.js', '/account.js', '/gestao.js'].includes(pathname)) relative = pathname.slice(1);
     else if (pathname.startsWith('/assets/')) { try { relative = decodeURIComponent(pathname).slice(1); } catch { throw fail(400, 'Endereço inválido.'); } }
     else throw fail(404, 'Página não encontrada.');
     if (relative.includes('\\') || relative.split('/').some(part => part === '..' || part.startsWith('.'))) throw fail(404, 'Arquivo não encontrado.');
     const file = path.resolve(PUBLIC, relative);
     if (!file.startsWith(PUBLIC + path.sep) || !MIME[path.extname(file).toLowerCase()]) throw fail(404, 'Arquivo não encontrado.');
     let content; try { content = await readFile(file); } catch (error) { if (['ENOENT', 'EISDIR'].includes(error.code)) throw fail(404, 'Arquivo não encontrado.'); throw error; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()], 'Cache-Control': relative === 'painel.html' ? 'no-store' : 'no-cache', 'Content-Length': content.length });
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()], 'Cache-Control': ['painel.html', 'gestao.html'].includes(relative) || memberPage ? 'no-store' : 'no-cache', 'Content-Length': content.length });
     res.end(req.method === 'HEAD' ? undefined : content);
   } catch (error) {
     if (!error.status) console.error('Erro interno:', error.message);
@@ -222,7 +238,7 @@ async function shutdown() {
   stopping = true;
   const deadline = setTimeout(() => process.exit(1), 10000);
   deadline.unref();
-  server.close(async () => { await storage.close().catch(() => {}); clearTimeout(deadline); process.exit(0); });
+  server.close(async () => { await Promise.allSettled([storage.close(), marketplace.close()]); clearTimeout(deadline); process.exit(0); });
   server.closeIdleConnections();
 }
 process.on('SIGTERM', shutdown);

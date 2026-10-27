@@ -146,7 +146,7 @@ async function localStorage(dataDir) {
   };
 }
 
-function databaseConnection(value) {
+export function databaseConnection(value) {
   let url;
   try { url = new URL(value); } catch { throw new TypeError('DATABASE_URL deve ser uma conexão PostgreSQL válida.'); }
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname) throw new TypeError('DATABASE_URL deve usar postgres:// ou postgresql://.');

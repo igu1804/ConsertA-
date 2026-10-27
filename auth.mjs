@@ -12,7 +12,7 @@ function setCookie(res, name, value, options) {
   const previous = res.getHeader('Set-Cookie') || [];
   res.setHeader('Set-Cookie', [...(Array.isArray(previous) ? previous : [previous]), serializeSetCookie({ name, value, ...options })]);
 }
-export async function teamSession(req, res) {
+export async function memberSession(req, res) {
   if (!authEnabled || !String(req.headers.cookie || '').includes('neon-auth')) return null;
   const auth = createAuthServer({ baseUrl, cookieSecret, sessionDataTtl: 60, sameSite: 'lax', log, context: () => ({
     getCookies: () => req.headers.cookie || '',
@@ -24,7 +24,11 @@ export async function teamSession(req, res) {
   const { data, error } = await auth.getSession();
   if (error) throw Object.assign(new Error('Não foi possível verificar o login. Tente novamente.'), { status: 503 });
   const user = data?.user;
-  return user?.emailVerified === true && team.has(String(user.email).toLowerCase()) ? user : null;
+  return user?.emailVerified === true && typeof user.id === 'string' ? user : null;
+}
+export async function teamSession(req, res) {
+  const user = await memberSession(req, res);
+  return user && team.has(String(user.email).toLowerCase()) ? user : null;
 }
 const routes = new Map([
   ['get-session', 'GET'], ['sign-in/email', 'POST'], ['sign-up/email', 'POST'], ['sign-out', 'POST'],
