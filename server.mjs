@@ -172,7 +172,16 @@ async function metrics() {
   }
   const byDevice = { mobile: 0, desktop: 0 }; views.forEach(e => byDevice[e.device === 'mobile' ? 'mobile' : 'desktop']++);
   const byAudience = { cliente: 0, profissional: 0 }; leads.forEach(l => byAudience[l.audience]++);
-  return { updatedAt: new Date().toISOString(), interestCount, visits: views.length, visitors: sessions.size, clicks: clicks.length, formStarts: events.filter(e => e.type === 'form_start').length, leads: leads.length, conversion: sessions.size ? converted.size / sessions.size * 100 : 0, buttons: [...CTA].map(id => ({ id, clicks: clicks.filter(e => e.id === id).length })).sort((a, b) => b.clicks - a.clicks), byDevice, byAudience, daily: [...daily.values()].sort((a, b) => a.date.localeCompare(b.date)), sources: Object.entries(views.reduce((all, e) => { all[e.source || 'direto'] = (all[e.source || 'direto'] || 0) + 1; return all; }, {})).map(([source, visits]) => ({ source, visits })), lastLeads: leads.slice(-20).reverse().map(({ id, at, name, contact, city, service, audience }) => ({ id, at, name, contact, city, service, audience })) };
+  const leadsByService = new Map();
+  for (const lead of leads) {
+    const name = lead.service || 'Não informado';
+    const key = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const group = leadsByService.get(key) || { service: name, total: 0, cliente: 0, profissional: 0 };
+    group.total++;
+    if (lead.audience === 'cliente' || lead.audience === 'profissional') group[lead.audience]++;
+    leadsByService.set(key, group);
+  }
+  return { updatedAt: new Date().toISOString(), interestCount, visits: views.length, visitors: sessions.size, clicks: clicks.length, formStarts: events.filter(e => e.type === 'form_start').length, leads: leads.length, conversion: sessions.size ? converted.size / sessions.size * 100 : 0, buttons: [...CTA].map(id => ({ id, clicks: clicks.filter(e => e.id === id).length })).sort((a, b) => b.clicks - a.clicks), byDevice, byAudience, leadsByService: [...leadsByService.values()].sort((a, b) => a.service.localeCompare(b.service, 'pt-BR')), daily: [...daily.values()].sort((a, b) => a.date.localeCompare(b.date)), sources: Object.entries(views.reduce((all, e) => { all[e.source || 'direto'] = (all[e.source || 'direto'] || 0) + 1; return all; }, {})).map(([source, visits]) => ({ source, visits })), lastLeads: leads.slice(-20).reverse().map(({ id, at, name, contact, city, service, audience }) => ({ id, at, name, contact, city, service, audience })) };
 }
 function csvCell(value) { let s = String(value ?? ''); if (/^[\s]*[=+@\-\t\r\n]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; }
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };

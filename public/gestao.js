@@ -3,17 +3,76 @@ const output = document.querySelector('#status');
 const labels = { pending: 'Aguardando', approved: 'Publicado', rejected: 'Ajustes solicitados', accepted: 'Aceito', declined: 'Recusado', completed: 'Concluído', open: 'Aberto', answered: 'Respondido' };
 const empty = message => `<div class="empty"><p>${e(message)}</p></div>`;
 const badge = (value, label = labels[value] || value) => `<span class="badge ${e(value)}">${e(label)}</span>`;
+const number = value => Number(value || 0).toLocaleString('pt-BR');
+const metricDate = value => new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(value));
+const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
 
-function renderServices(profiles) {
+function renderServices(profiles, leadServices) {
   const services = new Map();
+  for (const group of leadServices || []) {
+    const key = normalize(group.service);
+    services.set(key, { name: group.service, leads: group.total, interestedClients: group.cliente, interestedProviders: group.profissional, profiles: 0, visible: 0 });
+  }
   for (const profile of profiles) for (const service of profile.services || []) {
-    const key = service.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
-    const item = services.get(key) || { name: service, total: 0, visible: 0 };
-    item.total++;
+    const key = normalize(service);
+    const item = services.get(key) || { name: service, leads: 0, interestedClients: 0, interestedProviders: 0, profiles: 0, visible: 0 };
+    item.profiles++;
     if (profile.status === 'approved' && profile.consent && profile.availability !== 'unavailable') item.visible++;
     services.set(key, item);
   }
-  document.querySelector('#services').innerHTML = services.size ? `<table><thead><tr><th>Serviço</th><th>Perfis cadastrados</th><th>Visíveis na busca</th></tr></thead><tbody>${[...services.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(item => `<tr><td>${e(item.name)}</td><td>${item.total}</td><td>${item.visible}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Ainda não há serviços cadastrados por profissionais.</p>';
+  document.querySelector('#services').innerHTML = services.size ? `<table><thead><tr><th>Serviço</th><th>Interesses da landing</th><th>Clientes</th><th>Profissionais interessados</th><th>Perfis cadastrados</th><th>Visíveis na busca</th></tr></thead><tbody>${[...services.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(item => `<tr><td>${e(item.name)}</td><td>${number(item.leads)}</td><td>${number(item.interestedClients)}</td><td>${number(item.interestedProviders)}</td><td>${number(item.profiles)}</td><td>${number(item.visible)}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Ainda não há interesses por serviço nem perfis profissionais cadastrados.</p>';
+}
+
+function renderDailyChart(days) {
+  const host = document.querySelector('#daily-chart'); host.replaceChildren();
+  days = days.slice(-14);
+  if (!days.length) { host.innerHTML = empty('Ainda não há visitas ou cadastros registrados.'); return; }
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 620 225'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Visitas e cadastros por dia');
+  const max = Math.max(1, ...days.map(day => Math.max(day.visits, day.leads))), left = 34, right = 610, top = 12, bottom = 183, slot = (right - left) / days.length;
+  for (let tick = 0; tick <= 4; tick++) {
+    const y = bottom - (bottom - top) * tick / 4, line = document.createElementNS(ns, 'line');
+    for (const [key, value] of Object.entries({ x1: left, y1: y, x2: right, y2: y, stroke: '#edf0eb' })) line.setAttribute(key, value);
+    svg.append(line);
+    const text = document.createElementNS(ns, 'text'); text.setAttribute('x', '0'); text.setAttribute('y', y + 4); text.textContent = number(Math.round(max * tick / 4)); svg.append(text);
+  }
+  days.forEach((day, index) => {
+    const x = left + index * slot + slot * .15, width = Math.min(18, slot * .3);
+    for (const [key, color, offset] of [['visits', '#104456', 0], ['leads', '#c98a3c', width + 3]]) {
+      const height = day[key] / max * (bottom - top), rect = document.createElementNS(ns, 'rect');
+      for (const [attr, value] of Object.entries({ x: x + offset, y: bottom - height, width, height, fill: color, rx: 3 })) rect.setAttribute(attr, value);
+      const title = document.createElementNS(ns, 'title'); title.textContent = `${day.date}: ${number(day[key])} ${key === 'visits' ? 'visitas' : 'cadastros'}`; rect.append(title); svg.append(rect);
+    }
+    if (days.length <= 7 || index % 2 === 0) { const text = document.createElementNS(ns, 'text'); text.setAttribute('x', x); text.setAttribute('y', '207'); text.textContent = day.date.slice(5).split('-').reverse().join('/'); svg.append(text); }
+  });
+  host.append(svg);
+}
+
+function renderMeters(target, entries, total) {
+  const container = document.querySelector(target); container.replaceChildren();
+  if (!entries.length) { container.innerHTML = empty('Sem dados nesta categoria.'); return; }
+  for (const [label, value, base = total] of entries) {
+    const row = document.createElement('div'); row.className = 'metric-bar';
+    const heading = document.createElement('div'); heading.className = 'row between';
+    const name = document.createElement('span'); name.textContent = label;
+    const count = document.createElement('strong'); count.textContent = number(value); heading.append(name, count);
+    const track = document.createElement('div'); track.className = 'metric-track'; const fill = document.createElement('span'); fill.style.width = `${base ? Math.min(100, value / base * 100) : 0}%`; track.append(fill);
+    row.append(heading, track); container.append(row);
+  }
+}
+
+const buttonLabels = { hero_cliente: 'Topo · preciso de um profissional', hero_profissional: 'Topo · sou profissional', nav_piloto: 'Menu · participar do piloto', servico_eletrica: 'Serviço · elétrica', servico_hidraulica: 'Serviço · hidráulica', servico_montagem: 'Serviço · montagem', servico_reparos: 'Serviço · pequenos reparos', servico_limpeza: 'Serviço · diarista e limpeza', servico_baba: 'Serviço · babá', piloto_cliente: 'Piloto · perfil cliente', piloto_profissional: 'Piloto · perfil profissional', enviar_cliente: 'Formulário · enviar cliente', enviar_profissional: 'Formulário · enviar profissional', footer_piloto: 'Rodapé · participar do piloto', whatsapp_contato: 'WhatsApp · contato direto', whatsapp_cadastro: 'WhatsApp · após cadastro' };
+
+function renderAnalytics(data) {
+  for (const [id, value] of Object.entries({ 'metric-interests': data.interestCount, 'metric-visits': data.visits, 'metric-visitors': data.visitors, 'metric-clicks': data.clicks, 'metric-leads': data.leads })) document.querySelector(`#${id}`).textContent = number(value);
+  document.querySelector('#metric-conversion').textContent = `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(data.conversion)}%`;
+  document.querySelector('#metrics-updated').textContent = `Métricas atualizadas em ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(data.updatedAt))}.`;
+  renderDailyChart(data.daily);
+  renderMeters('#audience-bars', [['Celular', data.byDevice.mobile, data.visits], ['Computador', data.byDevice.desktop, data.visits], ['Clientes interessados', data.byAudience.cliente, data.leads], ['Profissionais interessados', data.byAudience.profissional, data.leads]], 0);
+  document.querySelector('#button-metrics').innerHTML = data.buttons.length ? `<table><thead><tr><th>Botão</th><th>Cliques</th></tr></thead><tbody>${data.buttons.map(item => `<tr><td>${e(buttonLabels[item.id] || item.id)}</td><td>${number(item.clicks)}</td></tr>`).join('')}</tbody></table><p class="tiny">Cliques repetidos contam; clicar em enviar não garante que o cadastro foi concluído.</p>` : empty('Nenhum clique registrado.');
+  document.querySelector('#traffic-sources').innerHTML = data.sources.length ? `<table><thead><tr><th>Origem</th><th>Sessões</th></tr></thead><tbody>${data.sources.map(item => `<tr><td>${e(item.source)}</td><td>${number(item.visits)}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Aguardando visitas com origem identificada.</p>';
+  document.querySelector('#form-starts').textContent = `${number(data.formStarts)} início(s) de preenchimento de formulário.`;
+  document.querySelector('#recent-leads').innerHTML = data.lastLeads.length ? `<table><thead><tr><th>Nome</th><th>Contato</th><th>Cidade</th><th>Serviço</th><th>Perfil</th><th>Data</th></tr></thead><tbody>${data.lastLeads.map(item => `<tr><td>${e(item.name)}</td><td>${e(item.contact)}</td><td>${e(item.city)}</td><td>${e(item.service)}</td><td>${e(item.audience)}</td><td>${metricDate(item.at)}</td></tr>`).join('')}</tbody></table>` : empty('Nenhum cadastro de interesse salvo ainda.');
 }
 
 function renderProfiles(profiles) {
@@ -45,13 +104,13 @@ function renderRequests(requests) {
 async function load() {
   status(output, 'Atualizando painel…');
   try {
-    const data = await api('/api/marketplace/team/overview');
+    const [data, metrics] = await Promise.all([api('/api/marketplace/team/overview'), api('/api/metrics')]);
     document.querySelector('#admin-role').textContent = data.role === 'chief' ? 'Administrador chefe · acesso global' : 'Administrador';
     document.querySelector('#count-accounts').textContent = data.accounts.length.toLocaleString('pt-BR');
     document.querySelector('#count-providers').textContent = data.profiles.length.toLocaleString('pt-BR');
     document.querySelector('#count-requests').textContent = data.requests.length.toLocaleString('pt-BR');
     document.querySelector('#count-tickets').textContent = data.tickets.filter(item => item.status === 'open').length.toLocaleString('pt-BR');
-    renderServices(data.profiles); renderProfiles(data.profiles); renderTickets(data.tickets); renderAccounts(data.accounts, data.role, data.profiles, data.requests); renderRequests(data.requests);
+    renderAnalytics(metrics); renderServices(data.profiles, metrics.leadsByService); renderProfiles(data.profiles); renderTickets(data.tickets); renderAccounts(data.accounts, data.role, data.profiles, data.requests); renderRequests(data.requests);
     status(output, 'Dados atualizados.');
   } catch (error) { status(output, error.message, true); }
 }

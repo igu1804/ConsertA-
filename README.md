@@ -23,6 +23,16 @@ O e-mail verificado `igor.camerino99@outlook.com` tem função de **administrado
 
 O [guia completo](GUIA-RENDER.md) também explica a publicação manual.
 
+## Como ler os painéis
+
+O `/administrador` reúne as métricas de validação da landing page e a atividade do marketplace. O `/painel` continua disponível e apresenta os mesmos indicadores da landing page, além dos mesmos quatro totais do marketplace.
+
+- **Landing page:** interesses únicos contam o primeiro clique por identificador anônimo do navegador; visitas contam uma por sessão; cliques incluem repetições; cadastros de interesse são formulários enviados; conversão relaciona sessões com cadastro às sessões visitantes. Um identificador de navegador não equivale a uma pessoa.
+- **Marketplace:** contas com login vêm do Neon Auth; prestadores com perfil, pedidos e dúvidas vêm das tabelas do marketplace. Esses registros começam quando alguém cria conta ou usa os fluxos autenticados.
+- **Reconciliação:** cadastros de interesse da landing page não são contas, perfis profissionais nem pedidos. A tabela por serviço mostra os interesses e perfis em colunas separadas; os dados históricos permanecem nos seus armazenamentos originais.
+
+Os eventos sintéticos identificados pelo modo de teste `?teste=1` continuam excluídos dos totais reais.
+
 ## Armazenamento e limites
 
 - O serviço Render Free pode hibernar sem tráfego; o próximo acesso pode demorar. Respeite as cotas do plano gratuito.

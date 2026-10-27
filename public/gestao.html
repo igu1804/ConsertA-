@@ -1,3 +1,70 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Painel administrador · ConsertAí</title><link rel="icon" href="/assets/simbolo.svg" type="image/svg+xml"><link rel="stylesheet" href="/marketplace.css"><script src="/marketplace-ui.js" defer></script><script src="/gestao.js" defer></script></head>
-<body><a class="skip" href="#conteudo">Pular para o conteúdo</a><header class="site-header"><div class="wrap header-inner"><a class="brand" href="/consertai"><img src="/assets/simbolo.svg" alt=""><span>Consert<span>Aí</span></span></a><nav aria-label="Menu"><a href="/painel">Métricas</a><a href="/equipe?sair=1">Minha conta / sair</a></nav></div></header><main id="conteudo" class="wrap"><section class="page-intro"><p class="eyebrow">ÁREA DA EQUIPE</p><h1>Painel administrador.</h1><p>Veja contas cadastradas, serviços, prestadores, pedidos e dúvidas do piloto. Os dados pessoais desta área são restritos à equipe.</p><div class="row"><span id="admin-role" class="badge">Administrador</span><button id="refresh" class="button alt" type="button">Atualizar dados</button></div><p id="status" class="status" role="status"></p></section><nav class="admin-nav" aria-label="Seções do painel"><a href="#resumo">Resumo</a><a href="#servicos">Serviços</a><a href="#duvidas">Dúvidas</a><a href="#prestadores">Prestadores</a><a href="#clientes">Clientes</a><a href="#pedidos">Pedidos</a></nav><section id="resumo" class="admin-summary" aria-label="Resumo"><div class="card"><small>Contas cadastradas</small><strong id="count-accounts">—</strong></div><div class="card"><small>Prestadores com perfil</small><strong id="count-providers">—</strong></div><div class="card"><small>Pedidos de serviço</small><strong id="count-requests">—</strong></div><div class="card"><small>Dúvidas abertas</small><strong id="count-tickets">—</strong></div></section><section id="servicos" class="admin-section"><h2>Serviços oferecidos</h2><p class="muted">Especialidades informadas pelos profissionais; veja quantos perfis aprovados oferecem cada serviço.</p><div id="services" class="card table-wrap"></div></section><section id="duvidas" class="admin-section"><h2>Tickets de dúvida</h2><p class="muted">Responda pelo painel. A pessoa verá a resposta em Minha conta.</p><div id="tickets" class="request-list"></div></section><section id="prestadores" class="admin-section"><h2>Prestadores cadastrados</h2><p class="muted">Perfis públicos exigem autorização e aprovação. Revise as alterações antes de aprovar.</p><div id="pending" class="request-list"></div><div id="all-profiles" class="request-list"></div></section><section id="clientes" class="admin-section"><h2>Clientes e demais contas</h2><p class="muted">Lista de contas do Neon Auth. Uma pessoa pode ser cliente e profissional ao mesmo tempo.</p><div id="accounts" class="card table-wrap"></div></section><section id="pedidos" class="admin-section"><h2>Pedidos de serviço</h2><p class="muted">Confirme a conclusão somente depois de verificar o atendimento com as partes. Isso libera a avaliação.</p><div id="requests" class="request-list"></div></section></main><footer class="site-footer"><div class="wrap"><span>ConsertAí · Painel restrito.</span><a href="/painel">Ver métricas e cadastros de interesse</a></div></footer></body></html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Painel administrador · ConsertAí</title>
+  <link rel="icon" href="/assets/simbolo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/marketplace.css">
+  <script src="/marketplace-ui.js" defer></script>
+  <script src="/gestao.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#conteudo">Pular para o conteúdo</a>
+  <header class="site-header"><div class="wrap header-inner">
+    <a class="brand" href="/consertai"><img src="/assets/simbolo.svg" alt=""><span>Consert<span>Aí</span></span></a>
+    <nav aria-label="Menu"><a href="#indicadores">Métricas</a><a href="/equipe?sair=1">Minha conta / sair</a></nav>
+  </div></header>
+  <main id="conteudo" class="wrap">
+    <section class="page-intro">
+      <p class="eyebrow">ÁREA DA EQUIPE</p>
+      <h1>Painel administrador.</h1>
+      <p>Indicadores da landing page e atividade do marketplace, no mesmo lugar. Os dados pessoais desta área são restritos à equipe.</p>
+      <div class="row"><span id="admin-role" class="badge">Administrador</span><button id="refresh" class="button alt" type="button">Atualizar dados</button></div>
+      <p id="status" class="status" role="status"></p>
+      <p id="metrics-updated" class="tiny"></p>
+    </section>
+
+    <nav class="admin-nav" aria-label="Seções do painel"><a href="#indicadores">Métricas da landing page</a><a href="#marketplace">Marketplace</a><a href="#servicos">Serviços e interesses</a><a href="#duvidas">Dúvidas</a><a href="#prestadores">Prestadores</a><a href="#clientes">Contas e cadastros</a><a href="#pedidos">Pedidos</a></nav>
+
+    <section id="indicadores" class="admin-section">
+      <h2>Métricas da landing page</h2>
+      <p class="muted">Mesmas definições e valores do painel de métricas. Interesses e cadastros do formulário são etapas de validação; não são contas com login.</p>
+      <div class="admin-summary" aria-label="Indicadores da landing page">
+        <div class="card"><small>Interesses únicos</small><strong id="metric-interests">—</strong><small>Um primeiro clique por identificador do navegador</small></div>
+        <div class="card"><small>Visitas registradas</small><strong id="metric-visits">—</strong><small>Uma visita por sessão</small></div>
+        <div class="card"><small>Sessões visitantes</small><strong id="metric-visitors">—</strong><small>Identificador anônimo no navegador</small></div>
+        <div class="card"><small>Cliques nos botões</small><strong id="metric-clicks">—</strong><small>Cliques repetidos são contados</small></div>
+        <div class="card"><small>Cadastros de interesse</small><strong id="metric-leads">—</strong><small>Formulários enviados, sem conta de login</small></div>
+        <div class="card"><small>Conversão de sessões</small><strong id="metric-conversion">—</strong><small>Sessões com cadastro ÷ sessões visitantes</small></div>
+      </div>
+      <div class="admin-analytics">
+        <section class="card"><h3>Visitas e cadastros por dia</h3><div id="daily-chart"></div><p class="tiny">Últimos 14 dias com atividade · fuso de Brasília.</p></section>
+        <section class="card"><h3>Quem está chegando</h3><div id="audience-bars" class="metric-bars"></div><p class="tiny">Dispositivos contam sessões; perfis contam formulários de interesse.</p></section>
+        <section class="card"><h3>Desempenho dos botões</h3><div id="button-metrics" class="table-wrap"></div></section>
+        <section class="card"><h3>Origem das visitas</h3><div id="traffic-sources"></div><p id="form-starts" class="tiny"></p><p class="tiny">A origem vem do parâmetro curto utm_source nos links de divulgação.</p></section>
+        <section class="card wide"><div class="row between"><div><h3>Cadastros de interesse recentes</h3><p class="tiny">São contatos recebidos pela landing page, não necessariamente contas com login ou prestadores ativos.</p></div><a class="button alt" href="/api/leads/export.csv">Exportar todos os cadastros</a></div><div id="recent-leads" class="table-wrap"></div><p class="tiny">A tabela mostra os 20 mais recentes; a exportação contém todos os cadastros salvos.</p></section>
+      </div>
+    </section>
+
+    <section id="marketplace" class="admin-section">
+      <h2>Atividade do marketplace</h2>
+      <p class="muted">Esses números vêm das contas autenticadas e dos fluxos de pedido, perfil profissional e suporte.</p>
+      <div class="admin-summary" aria-label="Indicadores do marketplace">
+        <div class="card"><small>Contas com login</small><strong id="count-accounts">—</strong></div>
+        <div class="card"><small>Prestadores com perfil</small><strong id="count-providers">—</strong></div>
+        <div class="card"><small>Pedidos de serviço</small><strong id="count-requests">—</strong></div>
+        <div class="card"><small>Dúvidas abertas</small><strong id="count-tickets">—</strong></div>
+      </div>
+    </section>
+
+    <section id="servicos" class="admin-section"><h2>Serviços e interesses</h2><p class="muted">Interesses dos formulários da landing page aparecem separados dos perfis profissionais cadastrados e aprovados no marketplace.</p><div id="services" class="card table-wrap"></div></section>
+    <section id="duvidas" class="admin-section"><h2>Tickets de dúvida</h2><p class="muted">Responda pelo painel. A pessoa verá a resposta em Minha conta.</p><div id="tickets" class="request-list"></div></section>
+    <section id="prestadores" class="admin-section"><h2>Prestadores cadastrados</h2><p class="muted">Perfis públicos exigem autorização e aprovação. Revise as alterações antes de aprovar.</p><div id="pending" class="request-list"></div><div id="all-profiles" class="request-list"></div></section>
+    <section id="clientes" class="admin-section"><h2>Contas e cadastros</h2><p class="muted">Contas com login vêm do Neon Auth. Cadastros de interesse da landing page ficam na seção de métricas e não são convertidos automaticamente em contas.</p><div id="accounts" class="card table-wrap"></div></section>
+    <section id="pedidos" class="admin-section"><h2>Pedidos de serviço</h2><p class="muted">Confirme a conclusão somente depois de verificar o atendimento com as partes. Isso libera a avaliação.</p><div id="requests" class="request-list"></div></section>
+  </main>
+  <footer class="site-footer"><div class="wrap"><span>ConsertAí · Painel restrito.</span><a href="/painel">Abrir painel de métricas</a></div></footer>
+</body>
+</html>
