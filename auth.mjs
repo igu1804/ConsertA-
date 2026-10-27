@@ -4,6 +4,12 @@ export const authEnabled = Boolean(process.env.NEON_AUTH_BASE_URL);
 const baseUrl = process.env.NEON_AUTH_BASE_URL;
 const cookieSecret = process.env.NEON_AUTH_COOKIE_SECRET;
 const team = new Set((process.env.ADMIN_EMAILS || '').split(',').map(email => email.trim().toLowerCase()).filter(Boolean));
+export const chiefAdminEmail = 'igor.camerino99@outlook.com';
+export function configuredRole(email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (normalized === chiefAdminEmail) return 'chief';
+  return team.has(normalized) ? 'admin' : null;
+}
 if (authEnabled && (!cookieSecret || cookieSecret.length < 32)) throw new Error('Configure NEON_AUTH_COOKIE_SECRET com pelo menos 32 caracteres.');
 if (authEnabled && new URL(baseUrl).protocol !== 'https:') throw new Error('NEON_AUTH_BASE_URL precisa usar HTTPS.');
 const log = { warn() {}, error() {} };
@@ -28,7 +34,11 @@ export async function memberSession(req, res) {
 }
 export async function teamSession(req, res) {
   const user = await memberSession(req, res);
-  return user && team.has(String(user.email).toLowerCase()) ? user : null;
+  return user && configuredRole(user.email) ? user : null;
+}
+export async function chiefSession(req, res) {
+  const user = await memberSession(req, res);
+  return user && configuredRole(user.email) === 'chief' ? user : null;
 }
 const routes = new Map([
   ['get-session', 'GET'], ['sign-in/email', 'POST'], ['sign-up/email', 'POST'], ['sign-out', 'POST'],

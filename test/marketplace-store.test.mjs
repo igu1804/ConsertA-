@@ -33,3 +33,28 @@ test('perfil, pedido e avaliação exigem as etapas corretas', async () => {
     assert.equal(await store.publicProfile(providerId), null);
   } finally { await store.close(); await rm(dir, { recursive: true, force: true }); }
 });
+
+test('tickets são privados e administradores podem ser atribuídos', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'consertai-support-'));
+  const store = await createMarketplaceStore({ dataDir: dir, databaseUrl: '' });
+  const userId = randomUUID();
+  const otherId = randomUUID();
+  const now = new Date().toISOString();
+  const ticket = { id: randomUUID(), userId, userName: 'Pessoa', userEmail: 'pessoa@example.com', subject: 'Dúvida sobre pedido', message: 'Como acompanhar meu pedido?', status: 'open', reply: '', createdAt: now, updatedAt: now };
+  try {
+    await store.createTicket(ticket);
+    assert.equal((await store.ticketsFor(userId)).length, 1);
+    assert.equal((await store.ticketsFor(otherId)).length, 0);
+    assert.equal((await store.allTickets()).length, 1);
+    assert.equal(await store.answerTicket(ticket.id, 'versão-antiga', 'Veja Minha conta', 'equipe'), null);
+    const answered = await store.answerTicket(ticket.id, now, 'Veja Minha conta', 'equipe');
+    assert.equal(answered.status, 'answered');
+    assert.equal(await store.answerTicket(ticket.id, now, 'Outra resposta', 'equipe'), null);
+    assert.equal(await store.adminRole(userId), null);
+    assert.equal(await store.setAdminRole(userId, 'admin'), 'admin');
+    assert.equal(await store.adminRole(userId), 'admin');
+    assert.equal((await store.allAdminRoles())[userId], 'admin');
+    assert.equal(await store.setAdminRole(userId, null), null);
+    assert.equal(await store.adminRole(userId), null);
+  } finally { await store.close(); await rm(dir, { recursive: true, force: true }); }
+});

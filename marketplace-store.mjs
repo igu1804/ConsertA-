@@ -29,6 +29,19 @@ const SCHEMA = `
     occurred_at TIMESTAMPTZ NOT NULL
   );
   CREATE INDEX IF NOT EXISTS consertai_provider_reviews_provider ON consertai_provider_reviews (provider_id);
+  CREATE TABLE IF NOT EXISTS consertai_support_tickets (
+    ticket_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('open', 'answered')),
+    updated_at TIMESTAMPTZ NOT NULL,
+    payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object')
+  );
+  CREATE INDEX IF NOT EXISTS consertai_support_tickets_user ON consertai_support_tickets (user_id, updated_at);
+  CREATE TABLE IF NOT EXISTS consertai_admin_roles (
+    user_id TEXT PRIMARY KEY,
+    role TEXT NOT NULL CHECK (role = 'admin'),
+    updated_at TIMESTAMPTZ NOT NULL
+  );
 `;
 
 const copy = value => value == null ? null : structuredClone(value);
@@ -41,7 +54,9 @@ async function localStore(dataDir) {
   const file = path.join(dataDir, 'marketplace.json');
   let state;
   try { state = JSON.parse(await readFile(file, 'utf8')); }
-  catch (error) { if (error.code !== 'ENOENT') throw error; state = { profiles: {}, requests: {}, reviews: {} }; }
+  catch (error) { if (error.code !== 'ENOENT') throw error; state = { profiles: {}, requests: {}, reviews: {}, tickets: {}, adminRoles: {} }; }
+  state.tickets ||= {};
+  state.adminRoles ||= {};
   let queue = Promise.resolve();
   function mutate(action) {
     const pending = queue.then(async () => {
@@ -93,6 +108,22 @@ async function localStore(dataDir) {
       return (state.reviews[requestId] = { requestId, customerId, providerId: request.providerId, stars, at: new Date().toISOString() });
     }),
     reviewsFor: ids => read(() => Object.values(state.reviews).filter(item => ids.includes(item.providerId))),
+    ticketsFor: id => read(() => Object.values(state.tickets).filter(item => item.userId === id).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))),
+    allTickets: () => read(() => Object.values(state.tickets).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))),
+    createTicket: ticket => mutate(() => (state.tickets[ticket.id] = ticket)),
+    answerTicket: (id, expectedUpdatedAt, reply, answeredBy) => mutate(() => {
+      const ticket = state.tickets[id];
+      if (!ticket || ticket.status !== 'open' || ticket.updatedAt !== expectedUpdatedAt) return null;
+      return (state.tickets[id] = { ...ticket, status: 'answered', reply, answeredBy, updatedAt: new Date().toISOString() });
+    }),
+    adminRole: id => read(() => state.adminRoles[id] || null),
+    allAdminRoles: () => read(() => state.adminRoles),
+    setAdminRole: (id, role) => mutate(() => {
+      if (role === 'admin') state.adminRoles[id] = 'admin';
+      else delete state.adminRoles[id];
+      return role;
+    }),
+    listAccounts: () => read(() => []),
     async close() { await queue; }
   };
 }
@@ -160,7 +191,7 @@ async function postgresStore(databaseUrl) {
       return result.rows[0]?.payload || null;
     },
     async requestsFor(id) { return (await query('SELECT payload FROM consertai_service_requests WHERE customer_id=$1 OR provider_id=$1 ORDER BY updated_at DESC LIMIT 200', [id])).rows.map(row => row.payload); },
-    async allRequests() { return (await query('SELECT payload FROM consertai_service_requests ORDER BY updated_at DESC LIMIT 200')).rows.map(row => row.payload); },
+    async allRequests() { return (await query('SELECT payload FROM consertai_service_requests ORDER BY updated_at DESC')).rows.map(row => row.payload); },
     async transitionRequest(id, from, to, actorId, role) {
       const actor = role === 'provider' ? 'AND provider_id=$4' : role === 'customer' ? 'AND customer_id=$4' : '';
       const updatedAt = new Date().toISOString();
@@ -182,6 +213,35 @@ async function postgresStore(databaseUrl) {
     async reviewsFor(ids) {
       if (!ids.length) return [];
       return (await query('SELECT request_id, provider_id, customer_id, stars, occurred_at FROM consertai_provider_reviews WHERE provider_id=ANY($1::text[])', [ids])).rows.map(row => ({ requestId: row.request_id, providerId: row.provider_id, customerId: row.customer_id, stars: row.stars, at: row.occurred_at.toISOString() }));
+    },
+    async ticketsFor(id) { return (await query('SELECT payload FROM consertai_support_tickets WHERE user_id=$1 ORDER BY updated_at DESC LIMIT 100', [id])).rows.map(row => row.payload); },
+    async allTickets() { return (await query('SELECT payload FROM consertai_support_tickets ORDER BY updated_at DESC')).rows.map(row => row.payload); },
+    async createTicket(ticket) {
+      await query('INSERT INTO consertai_support_tickets (ticket_id, user_id, status, updated_at, payload) VALUES ($1, $2, $3, $4, $5::jsonb)', [ticket.id, ticket.userId, ticket.status, ticket.updatedAt, JSON.stringify(ticket)]);
+      return ticket;
+    },
+    async answerTicket(id, expectedUpdatedAt, reply, answeredBy) {
+      const updatedAt = new Date().toISOString();
+      const result = await query(`UPDATE consertai_support_tickets SET status='answered', updated_at=now(),
+        payload=payload || $3::jsonb WHERE ticket_id=$1 AND status='open' AND payload->>'updatedAt'=$2 RETURNING payload`, [id, expectedUpdatedAt, JSON.stringify({ status: 'answered', reply, answeredBy, updatedAt })]);
+      return result.rows[0]?.payload || null;
+    },
+    async adminRole(id) { return (await query('SELECT role FROM consertai_admin_roles WHERE user_id=$1', [id])).rows[0]?.role || null; },
+    async allAdminRoles() { return Object.fromEntries((await query('SELECT user_id, role FROM consertai_admin_roles')).rows.map(row => [row.user_id, row.role])); },
+    async setAdminRole(id, role) {
+      if (role === 'admin') {
+        const result = await query(`INSERT INTO consertai_admin_roles (user_id, role, updated_at)
+          SELECT id, 'admin', now() FROM neon_auth."user" WHERE id=$1
+          ON CONFLICT (user_id) DO UPDATE SET role='admin', updated_at=now() RETURNING role`, [id]);
+        return result.rows[0]?.role || null;
+      }
+      await query('DELETE FROM consertai_admin_roles WHERE user_id=$1', [id]);
+      return null;
+    },
+    async listAccounts() {
+      const result = await query(`SELECT id, name, email, "emailVerified" AS verified, "createdAt" AS created_at
+        FROM neon_auth."user" ORDER BY "createdAt" DESC`);
+      return result.rows.map(row => ({ id: row.id, name: row.name || '', email: row.email, verified: row.verified === true, createdAt: row.created_at?.toISOString?.() || row.created_at }));
     },
     close: () => pool.end()
   };

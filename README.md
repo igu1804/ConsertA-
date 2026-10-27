@@ -17,14 +17,16 @@ O botão usa o `render.yaml` deste repositório para preparar um **Web Service n
 | `NEON_AUTH_COOKIE_SECRET` | Segredo aleatório com pelo menos 32 caracteres |
 | `ADMIN_EMAILS` | E-mails da equipe autorizados a acessar o painel |
 
-O Render fornece `PORT` automaticamente. Após o estado **Live**, use o endereço HTTPS informado pelo Render: `/consertai` abre a página, `/entrar` cria uma conta ou faz login, `/profissionais` mostra a busca após login, `/meu-perfil` recebe o perfil profissional, `/minha-conta` acompanha pedidos, `/equipe` abre o login da equipe, `/painel` contém as métricas privadas, `/gestao` revisa profissionais e pedidos e `/health` verifica o servidor. No primeiro acesso, crie sua conta e verifique seu e-mail. Apenas os e-mails em `ADMIN_EMAILS` recebem acesso aos painéis da equipe.
+O Render fornece `PORT` automaticamente. Após o estado **Live**, use o endereço HTTPS informado pelo Render: `/consertai` abre a página, `/entrar` cria uma conta ou faz login, `/profissionais` mostra a busca após login (inclusive a opção Outros), `/meu-perfil` recebe o perfil profissional, `/minha-conta` acompanha pedidos e tickets de dúvida, `/equipe` abre o login da equipe, `/painel` contém as métricas privadas, `/administrador` mostra serviços, pedidos, tickets, prestadores e contas, e `/health` verifica o servidor. No primeiro acesso, crie sua conta e verifique seu e-mail.
+
+O e-mail verificado `igor.camerino99@outlook.com` tem função de **administrador chefe**. Essa conta pode acessar todas as áreas administrativas e atribuir ou remover a função de administrador de outras contas verificadas ou cadastradas. E-mails em `ADMIN_EMAILS` também têm acesso de administrador, mas sua função é gerida na configuração do Render. A autorização é conferida no servidor, não apenas na interface.
 
 O [guia completo](GUIA-RENDER.md) também explica a publicação manual.
 
 ## Armazenamento e limites
 
 - O serviço Render Free pode hibernar sem tráfego; o próximo acesso pode demorar. Respeite as cotas do plano gratuito.
-- Com `DATABASE_URL`, o contador, os cadastros, os perfis, os pedidos, as avaliações e as métricas ficam no PostgreSQL externo. No Render, a inicialização exige esse banco para evitar perda de dados em disco efêmero.
+- Com `DATABASE_URL`, o contador, os cadastros, os perfis, os pedidos, os tickets, as avaliações, as funções administrativas atribuídas e as métricas ficam no PostgreSQL externo. No Render, a inicialização exige esse banco para evitar perda de dados em disco efêmero. A lista de contas vem da tabela gerenciada pelo Neon Auth.
 - Perfis profissionais exigem autorização explícita e aprovação pela equipe. Contatos são compartilhados entre as partes somente após o aceite do pedido. Nenhum cadastro antigo de interesse é transformado automaticamente em perfil público.
 - O [modelo de receita](MODELO-DE-RECEITA.md) contém hipóteses de comissão e VIP. O site ainda não processa pagamentos nem ativa assinaturas.
 - O contador soma o primeiro clique por identificador do navegador. Outro navegador, modo privado ou limpeza dos dados podem contar novamente; não é identificação de uma máquina física ou pessoa única.

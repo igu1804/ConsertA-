@@ -8,7 +8,7 @@ import { isIP } from 'node:net';
 import { createStorage } from './storage.mjs';
 import { createMarketplaceStore } from './marketplace-store.mjs';
 import { createMarketplaceApi } from './marketplace-api.mjs';
-import { authEnabled, memberSession, teamSession, proxyAuth } from './auth.mjs';
+import { authEnabled, memberSession, configuredRole, proxyAuth } from './auth.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -48,11 +48,17 @@ function localOnly(req) {
   const proxy = Object.keys(req.headers).some(name => /forwarded|^x-real-ip$|^cf-connecting-ip$|^true-client-ip$|^via$|^cf-ray$/i.test(name));
   return localAddress && localHost && !proxy;
 }
+async function adminAccess(req, res) {
+  const user = await memberSession(req, res);
+  if (!user) return null;
+  const role = configuredRole(user.email) || await marketplace.adminRole(user.id);
+  return role ? { user, role } : null;
+}
 async function allowAdmin(req, res) {
-  if (authEnabled && await teamSession(req, res)) return true;
+  if (authEnabled && await adminAccess(req, res)) return true;
   if (!authEnabled && !IS_RENDER && localOnly(req)) return true;
   if (authEnabled && !req.headers.authorization) {
-    if (['/painel', '/painel.html', '/gestao'].includes(new URL(req.url, 'http://localhost').pathname)) { res.writeHead(303, { Location: '/equipe', 'Cache-Control': 'no-store' }); res.end(); }
+    if (['/painel', '/painel.html', '/gestao', '/administrador'].includes(new URL(req.url, 'http://localhost').pathname)) { res.writeHead(303, { Location: '/equipe', 'Cache-Control': 'no-store' }); res.end(); }
     else json(res, 401, { ok: false, error: 'Entre com uma conta autorizada da equipe.' });
     return false;
   }
@@ -79,8 +85,8 @@ function limit(req, kind) {
   const forwarded = IS_RENDER ? String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() : '';
   const client = isIP(cloudflareClient) ? cloudflareClient : isIP(forwarded) ? forwarded : req.socket.remoteAddress;
   const key = `${client}:${kind}`;
-  const windowMs = kind === 'lead' ? 600000 : 60000;
-  const max = kind === 'lead' ? 12 : kind === 'interest' ? 60 : kind === 'admin' ? 30 : 240;
+  const windowMs = kind === 'lead' || kind === 'marketplace' ? 600000 : 60000;
+  const max = kind === 'lead' ? 12 : kind === 'marketplace' ? 30 : kind === 'interest' ? 60 : kind === 'admin' ? 30 : 240;
   let state = rate.get(key);
   if (!state || now - state.start >= windowMs) { state = { start: now, count: 0 }; rate.set(key, state); }
   if (++state.count > max) throw fail(429, 'Muitas tentativas. Aguarde alguns minutos e tente de novo.');
@@ -173,7 +179,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   try {
     const url = new URL(req.url, 'http://localhost'); const pathname = url.pathname;
-    const privateRoute = ['/painel', '/painel.html', '/gestao', '/api/metrics', '/api/leads/export.csv'].includes(pathname);
+    const privateRoute = ['/painel', '/painel.html', '/gestao', '/administrador', '/api/metrics', '/api/leads/export.csv'].includes(pathname);
     if (privateRoute && !await allowAdmin(req, res)) return;
     if (pathname.startsWith('/api/auth/')) {
       if (!sameOrigin(req)) throw fail(403, 'Origem não autorizada.');
@@ -191,7 +197,7 @@ const server = http.createServer(async (req, res) => {
     if (!['GET', 'HEAD'].includes(req.method)) { res.setHeader('Allow', 'GET, HEAD, POST'); throw fail(405, 'Método não permitido.'); }
     if (pathname === '/health') return json(res, 200, { ok: true });
     if (pathname === '/api/interest-count') return json(res, 200, { count: await storage.countInterests() });
-    if (pathname === '/api/team/session') return json(res, 200, { enabled: authEnabled, authorized: Boolean(await teamSession(req, res)) });
+    if (pathname === '/api/team/session') { const access = await adminAccess(req, res); return json(res, 200, { enabled: authEnabled, authorized: Boolean(access), role: access?.role || null }); }
     if (pathname === '/api/metrics') return json(res, 200, await metrics());
     if (pathname === '/api/leads/export.csv') {
       await storage.flush(); const leads = (await storage.rows('leads')).filter(l => !String(l.session).startsWith('qa_'));
@@ -208,7 +214,7 @@ const server = http.createServer(async (req, res) => {
     if (['/', '/consertai', '/consertai/', '/index.html'].includes(pathname)) relative = 'index.html';
     else if (['/painel', '/painel.html'].includes(pathname)) relative = 'painel.html';
     else if (pathname === '/equipe') relative = 'equipe.html';
-    else if (pathname === '/gestao') relative = 'gestao.html';
+    else if (['/gestao', '/administrador'].includes(pathname)) relative = 'gestao.html';
     else if (pathname === '/entrar') relative = 'entrar.html';
     else if (pathname === '/profissionais') relative = 'profissionais.html';
     else if (pathname === '/meu-perfil') relative = 'meu-perfil.html';

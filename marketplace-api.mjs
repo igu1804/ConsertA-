@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { authEnabled, memberSession } from './auth.mjs';
+import { authEnabled, memberSession, chiefSession, configuredRole } from './auth.mjs';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const availabilityValues = new Set(['available', 'limited', 'unavailable']);
@@ -15,7 +15,7 @@ export function createMarketplaceApi({ store, allowAdmin, bodyOf, fail, json, li
   }
   function write(req) {
     if (!sameOrigin(req)) throw fail(403, 'Origem não autorizada.');
-    limit(req, 'lead');
+    limit(req, 'marketplace');
   }
   function profileInput(body) {
     if (body.consent !== true) throw fail(400, 'Autorize a publicação do perfil e o compartilhamento do contato após aceitar um pedido.');
@@ -79,6 +79,33 @@ export function createMarketplaceApi({ store, allowAdmin, bodyOf, fail, json, li
         const [profiles, requests] = await Promise.all([store.allProfiles(), store.allRequests()]);
         json(res, 200, { profiles, requests }); return true;
       }
+      if (part[1] === 'overview' && part.length === 2 && !post) {
+        const [profiles, requests, tickets, accounts, assignedRoles, currentUser] = await Promise.all([
+          store.allProfiles(), store.allRequests(), store.allTickets(), store.listAccounts(), store.allAdminRoles(), authEnabled ? memberSession(req, res) : null
+        ]);
+        const role = currentUser && configuredRole(currentUser.email) === 'chief' ? 'chief' : 'admin';
+        const users = accounts.map(account => ({ ...account, role: configuredRole(account.email) || assignedRoles[account.id] || null, roleSource: configuredRole(account.email) ? 'configured' : assignedRoles[account.id] ? 'assigned' : null }));
+        json(res, 200, { role, profiles, requests, tickets, accounts: users }); return true;
+      }
+      if (part[1] === 'tickets' && part.length === 4 && post && uuid.test(part[2]) && part[3] === 'answer') {
+        const body = await bodyOf(req);
+        const reply = text(body.reply, 1000, true);
+        if (reply.length < 3) throw fail(400, 'Escreva uma resposta para o ticket.');
+        const admin = authEnabled ? await memberSession(req, res) : null;
+        const changed = await store.answerTicket(part[2], text(body.expectedUpdatedAt, 40, true), reply, admin?.email || 'equipe');
+        if (!changed) throw fail(409, 'O ticket foi alterado ou já respondido. Atualize a página.');
+        json(res, 200, { ok: true, ticket: changed }); return true;
+      }
+      if (part[1] === 'accounts' && part.length === 4 && post && uuid.test(part[2]) && ['grant-admin', 'revoke-admin'].includes(part[3])) {
+        const chief = await chiefSession(req, res);
+        if (!chief) throw fail(403, 'Somente o administrador chefe pode alterar administradores.');
+        const target = (await store.listAccounts()).find(account => account.id === part[2]);
+        if (!target) throw fail(404, 'Conta não encontrada.');
+        if (part[3] === 'grant-admin' && !target.verified) throw fail(409, 'Verifique o e-mail desta conta antes de conceder acesso administrativo.');
+        if (configuredRole(target.email)) throw fail(409, 'Esta conta tem função definida na configuração do serviço.');
+        const role = await store.setAdminRole(target.id, part[3] === 'grant-admin' ? 'admin' : null);
+        json(res, 200, { ok: true, userId: target.id, role }); return true;
+      }
       if (part[1] === 'providers' && part.length === 4 && post && uuid.test(part[2]) && ['approve', 'reject'].includes(part[3])) {
         const body = await bodyOf(req);
         const current = await store.profileByUser(part[2]);
@@ -128,6 +155,19 @@ export function createMarketplaceApi({ store, allowAdmin, bodyOf, fail, json, li
       const requests = await store.requestsFor(user.id);
       const reviews = await store.reviewsFor([...new Set(requests.map(item => item.providerId))]);
       json(res, 200, { requests: await Promise.all(requests.map(item => requestView(item, user.id, reviews))) }); return true;
+    }
+    if (part[0] === 'my-tickets' && part.length === 1 && !post) {
+      json(res, 200, { tickets: await store.ticketsFor(user.id) }); return true;
+    }
+    if (part[0] === 'tickets' && part.length === 1 && post) {
+      const body = await bodyOf(req);
+      const subject = text(body.subject, 120, true);
+      const message = text(body.message, 1500, true);
+      if (subject.length < 3 || message.length < 10) throw fail(400, 'Descreva sua dúvida com mais detalhes.');
+      const now = new Date().toISOString();
+      const ticket = { id: randomUUID(), userId: user.id, userName: user.name || '', userEmail: user.email, subject, message, status: 'open', reply: '', createdAt: now, updatedAt: now };
+      await store.createTicket(ticket);
+      json(res, 201, { ok: true, ticket }); return true;
     }
     if (part[0] === 'requests' && part.length === 1 && post) {
       const body = await bodyOf(req);
