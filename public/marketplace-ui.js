@@ -19,4 +19,17 @@ const money = cents => cents == null ? 'Sob orçamento' : (Number(cents) / 100).
 const date = value => new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 const phoneLink = phone => `https://wa.me/55${String(phone || '').replace(/\D/g, '')}`;
 window.MarketUI = { escapeHtml, api, status, money, date, phoneLink };
+if (!['/administrador', '/gestao'].includes(location.pathname)) {
+  fetch('/api/team/session', { credentials: 'same-origin', cache: 'no-store' })
+    .then(response => response.ok ? response.json() : null)
+    .then(session => {
+      const nav = document.querySelector('.site-header .header-inner nav');
+      if (!session?.authorized || !nav || nav.querySelector('a[href="/administrador"]')) return;
+      const link = document.createElement('a');
+      link.href = '/administrador';
+      link.textContent = 'Painel administrador';
+      nav.append(link);
+    })
+    .catch(() => {});
+}
 })();
