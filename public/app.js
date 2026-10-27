@@ -23,7 +23,7 @@
   interestPending=true;
   try{const response=await fetch('/api/interest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceId,button,source,audience:state.audience}),keepalive:true});const result=await response.json();if(response.ok&&result.ok){interestSent=true;showInterestCount(result.count);}}catch{}finally{interestPending=false;}
  }
- document.addEventListener('click',event=>{const control=event.target instanceof Element?event.target.closest('a,button,summary'):null;if(!control||!event.isTrusted)return;registerInterest(control.dataset.cta||control.dataset.role||control.id||control.tagName.toLowerCase()+'_geral');},{capture:true});
+ document.addEventListener('click',event=>{const control=event.target instanceof Element?event.target.closest('a,button,summary'):null;if(!control||!event.isTrusted||control.id==='install-app')return;registerInterest(control.dataset.cta||control.dataset.role||control.id||control.tagName.toLowerCase()+'_geral');},{capture:true});
  refreshInterestCount();
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshInterestCount();});
  setInterval(refreshInterestCount,30000);
@@ -64,6 +64,18 @@
  form.addEventListener('focusin',() => { if(!state.started) { track('form_start',state.audience); state.started=true; } });
  $('.menu-toggle').addEventListener('click',function() { const open = $('#nav').classList.toggle('open'); this.setAttribute('aria-expanded',String(open)); this.setAttribute('aria-label',open?'Fechar menu':'Abrir menu'); });
  document.querySelectorAll('#nav a').forEach(a=>a.addEventListener('click',()=>{ $('#nav').classList.remove('open'); $('.menu-toggle').setAttribute('aria-expanded','false'); }));
+ const installButton=$('#install-app'), installDialog=$('#install-dialog'), installMessage=$('#install-message');
+ let installPrompt;
+ window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;});
+ window.addEventListener('appinstalled',()=>{installButton.textContent='App instalado';installButton.disabled=true;});
+ installButton.addEventListener('click',async()=>{
+  if(window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone){installMessage.textContent='O ConsertAí já está instalado neste aparelho.';installDialog.showModal();return;}
+  if(installPrompt){installPrompt.prompt();const result=await installPrompt.userChoice;installPrompt=null;if(result.outcome==='accepted')return;}
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  installMessage.textContent=isIOS?'No Safari, toque em Compartilhar e escolha “Adicionar à Tela de Início”. Se estiver em outro navegador, abra este endereço no Safari primeiro.':'No celular, abra este endereço no Chrome, toque no menu ⋮ e escolha “Instalar app” ou “Adicionar à tela inicial”. Se a opção não aparecer, atualize a página e tente novamente.';
+  installDialog.showModal();
+ });
+ $('.close-install-dialog').addEventListener('click',()=>installDialog.close());
  const dialog = $('#privacy-dialog');
  document.querySelectorAll('[data-open-privacy]').forEach(b=>b.addEventListener('click',()=>dialog.showModal()));
  $('.close-dialog').addEventListener('click',()=>dialog.close());

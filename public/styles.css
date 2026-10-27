@@ -21,6 +21,7 @@
 
 .footer-links{display:flex;align-items:center;gap:24px;font-size:11px}.footer-links a:hover{text-decoration:underline;text-underline-offset:3px}
 @media(max-width:620px){.footer-links{flex-direction:column;align-items:flex-end;gap:8px;font-size:10px}}
+.button-install{background:var(--white);color:var(--teal);border-color:var(--line)}.button-install:hover{background:var(--sand)}.button-install:disabled{cursor:default;opacity:.75}
 @media(min-width:621px) and (max-width:700px){
   .header-inner{min-height:74px}
   .menu-toggle{display:flex;flex-direction:column;gap:6px;border:1px solid #cad5d0;border-radius:7px;padding:11px;background:transparent}
