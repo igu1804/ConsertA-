@@ -16,17 +16,12 @@
  try { deviceId=localStorage.getItem('consertai_device_id'); if(!/^[a-f0-9-]{36}$/i.test(deviceId||'')){deviceId=crypto.randomUUID();localStorage.setItem('consertai_device_id',deviceId);} } catch {deviceId=crypto.randomUUID();}
  if(params.get('teste')==='1') deviceId='qa_'+crypto.randomUUID();
  let interestSent=false, interestPending=false;
- function showInterestCount(count){if(Number.isSafeInteger(count)&&count>=0)$('#interest-count').textContent=new Intl.NumberFormat('pt-BR').format(count);}
- async function refreshInterestCount(){if(document.hidden)return;try{const response=await fetch('/api/interest-count',{cache:'no-store'});if(response.ok){const result=await response.json();showInterestCount(result.count);}}catch{}}
  async function registerInterest(button){
   if(interestSent||interestPending)return;
   interestPending=true;
-  try{const response=await fetch('/api/interest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceId,button,source,audience:state.audience}),keepalive:true});const result=await response.json();if(response.ok&&result.ok){interestSent=true;showInterestCount(result.count);}}catch{}finally{interestPending=false;}
+  try{const response=await fetch('/api/interest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceId,button,source,audience:state.audience}),keepalive:true});const result=await response.json();if(response.ok&&result.ok)interestSent=true;}catch{}finally{interestPending=false;}
  }
  document.addEventListener('click',event=>{const control=event.target instanceof Element?event.target.closest('a,button,summary'):null;if(!control||!event.isTrusted||control.id==='install-app')return;registerInterest(control.dataset.cta||control.dataset.role||control.id||control.tagName.toLowerCase()+'_geral');},{capture:true});
- refreshInterestCount();
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshInterestCount();});
- setInterval(refreshInterestCount,30000);
  function setAudience(audience) {
   state.audience = audience === 'profissional' ? 'profissional' : 'cliente';
   form.elements.audience.value = state.audience;
