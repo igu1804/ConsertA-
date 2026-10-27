@@ -1,5 +1,6 @@
 (() => {
  'use strict';
+ if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(() => {}), { once: true });
  const $ = s => document.querySelector(s);
  const form = $('#lead-form'), status = $('#form-status');
  const state = { audience: 'cliente', started: false };

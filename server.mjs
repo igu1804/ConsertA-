@@ -184,7 +184,7 @@ async function metrics() {
   return { updatedAt: new Date().toISOString(), interestCount, visits: views.length, visitors: sessions.size, clicks: clicks.length, formStarts: events.filter(e => e.type === 'form_start').length, leads: leads.length, conversion: sessions.size ? converted.size / sessions.size * 100 : 0, buttons: [...CTA].map(id => ({ id, clicks: clicks.filter(e => e.id === id).length })).sort((a, b) => b.clicks - a.clicks), byDevice, byAudience, leadsByService: [...leadsByService.values()].sort((a, b) => a.service.localeCompare(b.service, 'pt-BR')), daily: [...daily.values()].sort((a, b) => a.date.localeCompare(b.date)), sources: Object.entries(views.reduce((all, e) => { all[e.source || 'direto'] = (all[e.source || 'direto'] || 0) + 1; return all; }, {})).map(([source, visits]) => ({ source, visits })), lastLeads: leads.slice(-20).reverse().map(({ id, at, name, contact, city, service, audience }) => ({ id, at, name, contact, city, service, audience })) };
 }
 function csvCell(value) { let s = String(value ?? ''); if (/^[\s]*[=+@\-\t\r\n]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; }
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.webmanifest': 'application/manifest+json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
 const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -224,7 +224,9 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
     let relative;
-    if (['/', '/consertai', '/consertai/', '/index.html'].includes(pathname)) relative = 'index.html';
+    if (pathname === '/sw.js') relative = 'sw.js';
+    else if (pathname === '/manifest.webmanifest') relative = 'manifest.webmanifest';
+    else if (['/', '/consertai', '/consertai/', '/index.html'].includes(pathname)) relative = 'index.html';
     else if (['/painel', '/painel.html'].includes(pathname)) relative = 'painel.html';
     else if (pathname === '/equipe') relative = 'equipe.html';
     else if (['/gestao', '/administrador'].includes(pathname)) relative = 'gestao.html';
@@ -239,7 +241,7 @@ const server = http.createServer(async (req, res) => {
     const file = path.resolve(PUBLIC, relative);
     if (!file.startsWith(PUBLIC + path.sep) || !MIME[path.extname(file).toLowerCase()]) throw fail(404, 'Arquivo não encontrado.');
     let content; try { content = await readFile(file); } catch (error) { if (['ENOENT', 'EISDIR'].includes(error.code)) throw fail(404, 'Arquivo não encontrado.'); throw error; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()], 'Cache-Control': ['painel.html', 'gestao.html'].includes(relative) || memberPage ? 'no-store' : 'no-cache', 'Content-Length': content.length });
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()], 'Cache-Control': ['painel.html', 'gestao.html'].includes(relative) || memberPage ? 'no-store' : 'no-cache', ...(relative === 'sw.js' ? { 'Service-Worker-Allowed': '/' } : {}), 'Content-Length': content.length });
     res.end(req.method === 'HEAD' ? undefined : content);
   } catch (error) {
     if (!error.status) console.error('Erro interno:', error.message);
