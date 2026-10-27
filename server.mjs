@@ -27,7 +27,7 @@ if (IS_RENDER && storage.mode !== 'postgres') throw new Error('O Render precisa 
 const marketplace = await createMarketplaceStore({ dataDir: DATA });
 if (IS_RENDER && marketplace.mode !== 'postgres') throw new Error('O marketplace precisa usar o PostgreSQL configurado no Render.');
 const INTEREST_ID = /^(?:qa_)?[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const CTA = new Set(['hero_cliente', 'hero_profissional', 'nav_piloto', 'vip_plano', 'servico_eletrica', 'servico_hidraulica', 'servico_montagem', 'servico_reparos', 'servico_limpeza', 'servico_baba', 'piloto_cliente', 'piloto_profissional', 'enviar_cliente', 'enviar_profissional', 'footer_piloto', 'whatsapp_contato', 'whatsapp_cadastro']);
+const CTA = new Set(['hero_cliente', 'hero_profissional', 'nav_piloto', 'vip_plano', 'servico_eletrica', 'servico_hidraulica', 'servico_montagem', 'servico_reparos', 'servico_limpeza', 'servico_baba', 'servico_outros', 'piloto_cliente', 'piloto_profissional', 'enviar_cliente', 'enviar_profissional', 'footer_piloto', 'whatsapp_contato', 'whatsapp_cadastro']);
 const SESSION = /^[a-zA-Z0-9_-]{8,100}$/;
 const rate = new Map();
 function json(res, status, value) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); }
