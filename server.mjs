@@ -58,7 +58,11 @@ async function allowAdmin(req, res) {
   if (authEnabled && await adminAccess(req, res)) return true;
   if (!authEnabled && !IS_RENDER && localOnly(req)) return true;
   if (authEnabled && !req.headers.authorization) {
-    if (['/painel', '/painel.html', '/gestao', '/administrador'].includes(new URL(req.url, 'http://localhost').pathname)) { res.writeHead(303, { Location: '/equipe', 'Cache-Control': 'no-store' }); res.end(); }
+    const page = new URL(req.url, 'http://localhost').pathname;
+    if (['/painel', '/painel.html', '/gestao', '/administrador'].includes(page)) {
+      const destination = ['/gestao', '/administrador'].includes(page) ? '/administrador' : '/painel';
+      res.writeHead(303, { Location: `/equipe?voltar=${encodeURIComponent(destination)}`, 'Cache-Control': 'no-store' }); res.end();
+    }
     else json(res, 401, { ok: false, error: 'Entre com uma conta autorizada da equipe.' });
     return false;
   }

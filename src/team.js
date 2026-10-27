@@ -6,6 +6,9 @@ const submit = document.querySelector('#submit');
 const verification = document.querySelector('#verification');
 let mode = 'login';
 const message = value => { status.textContent = value; };
+const destination = () => ['/administrador', '/painel'].includes(new URLSearchParams(location.search).get('voltar'))
+  ? new URLSearchParams(location.search).get('voltar')
+  : '/administrador';
 document.querySelector('#register').addEventListener('click', () => {
   mode = mode === 'login' ? 'register' : 'login';
   document.querySelector('#name-field').hidden = mode !== 'register';
@@ -17,7 +20,7 @@ document.querySelector('#register').addEventListener('click', () => {
 async function finish() {
   const response = await fetch('/api/team/session', { cache: 'no-store' });
   const session = await response.json();
-  if (session.authorized) location.assign('/painel');
+  if (session.authorized) location.assign(destination());
   else message('Sua conta precisa ter o e-mail verificado e estar autorizada pelo responsável da equipe.');
 }
 form.addEventListener('submit', async event => {
@@ -63,6 +66,6 @@ document.querySelector('#logout').addEventListener('click', async () => {
   catch { message('Não foi possível sair. Tente novamente.'); }
 });
 fetch('/api/team/session', { cache: 'no-store' }).then(response => response.json()).then(session => {
-  if (session.authorized && !new URLSearchParams(location.search).has('sair')) location.replace('/painel');
+  if (session.authorized && !new URLSearchParams(location.search).has('sair')) location.replace(destination());
   else if (!session.enabled) { message('O login da equipe ainda não foi configurado.'); submit.disabled = true; }
 }).catch(() => message('Não foi possível verificar a conexão. Atualize a página.'));
